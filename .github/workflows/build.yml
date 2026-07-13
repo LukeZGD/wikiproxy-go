@@ -1,0 +1,35 @@
+name: Compile wikiproxy-go
+on: [push]
+jobs:
+  wikiproxy-go-linux:
+    strategy:
+      matrix:
+        arch:
+          - runner: ubuntu-22.04
+            name: x86_64
+          - runner: ubuntu-22.04-arm
+            name: aarch64
+
+    name: linux-${{ matrix.arch.name }}
+    runs-on: ${{ matrix.arch.runner }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run compile script
+        run: go build main.go
+
+      - name: Zip wikiproxy-go
+        run: zip -r wikiproxy-go_linux-${{ matrix.arch.name }}.zip main
+
+      - name: Update latest release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload latest \
+            wikiproxy-go_linux-${{ matrix.arch.name }}.zip \
+            --clobber -R ${{ github.repository }}
+
+          gh release edit latest \
+            --title "Latest" \
+            --target ${{ github.sha }} -R ${{ github.repository }}
