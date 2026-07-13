@@ -8,6 +8,7 @@ import (
     "net/url"
     "strings"
     "time"
+    "os"
 )
 
 // --- Structs for API Responses ---
@@ -131,7 +132,7 @@ func parsePage(data, identifier, boardconfig string) (FirmwareResponse, error) {
     if boardconfig != "" {
         if _, hasModel := pageData["Model"]; !hasModel {
             if _, hasModel2 := pageData["Model2"]; !hasModel2 {
-                // If neither exist, we just proceed (matching Python logic)
+                // Proceed if neither exist
             }
         } else {
             // Check if boardconfig exists in any of the values
@@ -197,7 +198,7 @@ func parsePage(data, identifier, boardconfig string) (FirmwareResponse, error) {
         image := FirmwareKey{
             Image:    component,
             Filename: filename,
-            Date:     time.Now().Format("2006-01-02T15:04:05.000000"), // Matching python isoformat
+            Date:     time.Now().Format("2006-01-02T15:04:05.000000"),
         }
 
         if component == "RootFS" || component == "RestoreRamdisk" || component == "UpdateRamdisk" {
@@ -241,10 +242,35 @@ func parsePage(data, identifier, boardconfig string) (FirmwareResponse, error) {
 // --- Server & Handlers ---
 
 func handleKeys(w http.ResponseWriter, r *http.Request) {
-    // Requires Go 1.22+ for r.PathValue
-    identifier := r.PathValue("identifier")
-    buildid := r.PathValue("buildid")
-    boardconfig := r.PathValue("boardconfig") // Will be empty if not provided in URL
+    // Go 1.14 method restriction check
+    if r.Method != http.MethodGet {
+        http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+        return
+    }
+
+    // Go 1.14 manual path segment parsing
+    // r.URL.Path will look like "/firmware/iPhone4,1/11A4372q"
+    // or "/firmware/iPhone4,1/n94ap/11A4372q"
+    path := strings.Trim(r.URL.Path, "/")
+    segments := strings.Split(path, "/")
+
+    var identifier, boardconfig, buildid string
+
+    // segments[0] is always "firmware" due to Mux routing
+    switch len(segments) {
+        case 3:
+            // Format: /firmware/{identifier}/{buildid}
+            identifier = segments[1]
+            buildid = segments[2]
+        case 4:
+            // Format: /firmware/{identifier}/{boardconfig}/{buildid}
+            identifier = segments[1]
+            boardconfig = segments[2]
+            buildid = segments[3]
+        default:
+            http.Error(w, "Not Found", http.StatusNotFound)
+            return
+    }
 
     wikitext, err := getKeyPage(identifier, buildid)
     if err != nil {
@@ -265,11 +291,22 @@ func handleKeys(w http.ResponseWriter, r *http.Request) {
 func main() {
     mux := http.NewServeMux()
 
-    // Register routes (Go 1.22+ syntax)
-    mux.HandleFunc("GET /firmware/{identifier}/{buildid}", handleKeys)
-    mux.HandleFunc("GET /firmware/{identifier}/{boardconfig}/{buildid}", handleKeys)
+    // Go 1.14 compliant catch-all prefix route
+    mux.HandleFunc("/firmware/", handleKeys)
 
-    port := ":8888"
+    // Default to 8888
+    port := "8888"
+
+    // Override with command-line argument if provided
+    if len(os.Args) > 1 {
+        port = os.Args[1]
+    }
+
+    // Ensure the port string starts with a colon
+    if !strings.HasPrefix(port, ":") {
+        port = ":" + port
+    }
+
     fmt.Printf("Server starting on http://127.0.0.1%s...\n", port)
     if err := http.ListenAndServe(port, mux); err != nil {
         log.Fatalf("Server failed to start: %v", err)
