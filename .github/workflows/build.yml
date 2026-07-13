@@ -17,10 +17,14 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Run compile script
-        run: go build main.go
+        run: |
+          go build main.go
+          go mod init wikiproxy-go-ipw
+          go get github.com/PuerkitoBio/goquery
+          go build main-ipw.go
 
       - name: Zip wikiproxy-go
-        run: zip -r wikiproxy-go_linux-${{ matrix.arch.name }}.zip main
+        run: zip -r wikiproxy-go_linux-${{ matrix.arch.name }}.zip main main-ipw
 
       - name: Update latest release
         env:
