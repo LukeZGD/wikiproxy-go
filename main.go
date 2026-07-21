@@ -60,11 +60,24 @@ func getKeyPage(identifier, buildid string) (string, error) {
         url.QueryEscape(fmt.Sprintf("intitle:%s %s", identifier, buildid)),
     )
 
-    resp, err := http.Get(searchURL)
+    // Create a custom request so we can set headers
+    req, err := http.NewRequest(http.MethodGet, searchURL, nil)
+    if err != nil {
+        return "", fmt.Errorf("failed to create search request: %w", err)
+    }
+    // Spoof a standard web browser User-Agent to bypass basic blocks
+    req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+    resp, err := http.DefaultClient.Do(req)
     if err != nil {
         return "", fmt.Errorf("search request failed: %w", err)
     }
     defer resp.Body.Close()
+
+    // Catch non-200 responses before trying to decode HTML as JSON
+    if resp.StatusCode != http.StatusOK {
+        return "", fmt.Errorf("search request failed with HTTP %d: %s", resp.StatusCode, resp.Status)
+    }
 
     var searchData SearchResponse
     if err := json.NewDecoder(resp.Body).Decode(&searchData); err != nil {
@@ -83,11 +96,21 @@ func getKeyPage(identifier, buildid string) (string, error) {
         url.QueryEscape(title),
     )
 
-    resp2, err := http.Get(parseURL)
+    req2, err := http.NewRequest(http.MethodGet, parseURL, nil)
+    if err != nil {
+        return "", fmt.Errorf("failed to create parse request: %w", err)
+    }
+    req2.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+    resp2, err := http.DefaultClient.Do(req2)
     if err != nil {
         return "", fmt.Errorf("parse request failed: %w", err)
     }
     defer resp2.Body.Close()
+
+    if resp2.StatusCode != http.StatusOK {
+        return "", fmt.Errorf("parse request failed with HTTP %d: %s", resp2.StatusCode, resp2.Status)
+    }
 
     var parseData ParseResponse
     if err := json.NewDecoder(resp2.Body).Decode(&parseData); err != nil {
