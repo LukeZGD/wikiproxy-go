@@ -21,6 +21,8 @@ go build main.go
 
 ### The iPhone Wiki version
 
+Note: The iPhone Wiki is no longer available, so this version is unusable. The code and build instructions are kept for archival purposes.
+
 Initialize the module and install the required dependency:
 
 ```

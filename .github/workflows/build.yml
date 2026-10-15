@@ -1,5 +1,8 @@
 name: Compile wikiproxy-go
-on: [push]
+on:
+  push:
+    branches:
+      - main
 jobs:
   wikiproxy-go-linux:
     strategy:
@@ -14,17 +17,13 @@ jobs:
     runs-on: ${{ matrix.arch.runner }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Run compile script
-        run: |
-          go build main.go
-          go mod init wikiproxy-go-ipw
-          go get github.com/PuerkitoBio/goquery
-          go build main-ipw.go
+        run: go build main.go
 
       - name: Zip wikiproxy-go
-        run: zip -r wikiproxy-go_linux-${{ matrix.arch.name }}.zip main main-ipw
+        run: zip -r wikiproxy-go_linux-${{ matrix.arch.name }}.zip main
 
       - name: Update latest release
         env:
